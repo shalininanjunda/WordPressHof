@@ -1,0 +1,174 @@
+/*Homepage -customiser */
+.jobs-thesis-wrapper {
+    display: grid;
+    gap: 16px;
+  }
+  
+  /* Card container */
+  .job-thesis-card {
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  /* Header row */
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .card-title {
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 600;
+    color: #222;
+  }
+  
+  /* Common badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;   /* lighter text */
+    border: 1px solid transparent; /* thinner border */
+    line-height: 1em;
+    font-family: "Source Sans Pro", Sans-serif;
+  }
+  
+  /* Thesis (green) */
+  .badge-thesis {
+    background: #ABEFC6;   /* light green fill */
+    color: #067647;
+    border-color: #27ae60;
+  }
+  .badge-thesis::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #27ae60;
+    display: inline-block;
+  }
+  
+  /* Jobs (blue) */
+  .badge-job {
+    background: #EFF8FF;   /* lighter blue fill */
+    color: #175CD3;        /* text color */
+    border-color: #B2DDFF; /* border color */
+  }
+  .badge-job::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #175CD3;   /* blue dot */
+    display: inline-block;
+  }
+
+  /* Footer (date left, supervisor right) */
+  .card-footer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-top: 6px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 8px;
+    gap: 40px; /* spacing between date & supervisor block */
+  }
+  
+  /* Left: date + duration */
+  .card-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 0.85rem;
+    color: #555;
+    align-items: center;
+  }
+  .card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .card-meta svg {
+    flex-shrink: 0;
+  }
+  
+  /* Right: supervisor */
+  .supervisor-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .supervisor-box img.avatar,
+  .supervisor-box .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  
+  .sup-info {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+  
+  .sup-name {
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #222;
+  }
+  
+  .sup-position {
+    font-size: 0.75rem;
+    color: #666;
+  }
+  
+  .sup-role {
+    font-size: 0.7rem;
+    color: #888;
+  }
+  
+  /* Icons row */
+  .sup-icons {
+    display: flex;
+    gap: 10px;
+    margin-top: 3px;
+  }
+  
+  .sup-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.8; /* thicker lines */
+  }
+  
+  /* Button */
+  .more-info-btn {
+    margin-top: auto;
+    display: inline-block;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: #f9f9f9;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: #2980b9;
+    border: 1px solid #ddd;
+  }
+  .more-info-btn:hover {
+    background: #efefef;
+  }
+  
