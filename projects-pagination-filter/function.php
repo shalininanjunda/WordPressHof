@@ -130,7 +130,7 @@ function projekte_tabs_shortcode() {
         const hash = window.location.hash.replace("#", "");
         const params = new URLSearchParams(hash);
         let page = parseInt(params.get("page")) || 1;
-        if (page < 1) page = 1; // ✅ ensure page is always >= 1
+        if (page < 1) page = 1;
         return {
           filter: params.get("filter") || "all",
           tab: params.get("tab") || "all",
@@ -166,23 +166,98 @@ function projekte_tabs_shortcode() {
 
         if (totalPages <= 1) return;
 
-        for (let i = 1; i <= totalPages; i++) {
-          const params = new URLSearchParams();
-          params.set("filter", state.filter);
-          params.set("tab", state.tab);
-          params.set("page", i);
-          const link = document.createElement("a");
-          link.href = "#" + params.toString();
-          link.textContent = i;
-          if (i === currentPage) link.classList.add("active");
-          pagination.appendChild(link);
+        // Prev link
+        if (currentPage > 1) {
+          const prevParams = new URLSearchParams();
+          prevParams.set("filter", state.filter);
+          prevParams.set("tab", state.tab);
+          prevParams.set("page", currentPage - 1);
+          const prev = document.createElement("a");
+          prev.href = "#" + prevParams.toString();
+          prev.textContent = "«";
+          prev.classList.add("prev", "page-numbers");
+          pagination.appendChild(prev);
+        }
+
+        let range = 2; // neighbors around current
+        let startPage = Math.max(1, currentPage - range);
+        let endPage = Math.min(totalPages, currentPage + range);
+
+        if (startPage > 1) {
+          // First page
+          const firstParams = new URLSearchParams();
+          firstParams.set("filter", state.filter);
+          firstParams.set("tab", state.tab);
+          firstParams.set("page", 1);
+          const first = document.createElement("a");
+          first.href = "#" + firstParams.toString();
+          first.textContent = "1";
+          first.classList.add("page-numbers");
+          pagination.appendChild(first);
+
+          if (startPage > 2) {
+            const dots = document.createElement("span");
+            dots.textContent = "…";
+            dots.classList.add("page-numbers", "dots");
+            pagination.appendChild(dots);
+          }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+          if (i === currentPage) {
+            const span = document.createElement("span");
+            span.textContent = i;
+            span.classList.add("page-numbers", "current");
+            pagination.appendChild(span);
+          } else {
+            const params = new URLSearchParams();
+            params.set("filter", state.filter);
+            params.set("tab", state.tab);
+            params.set("page", i);
+            const link = document.createElement("a");
+            link.href = "#" + params.toString();
+            link.textContent = i;
+            link.classList.add("page-numbers");
+            pagination.appendChild(link);
+          }
+        }
+
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const dots = document.createElement("span");
+            dots.textContent = "…";
+            dots.classList.add("page-numbers", "dots");
+            pagination.appendChild(dots);
+          }
+
+          const lastParams = new URLSearchParams();
+          lastParams.set("filter", state.filter);
+          lastParams.set("tab", state.tab);
+          lastParams.set("page", totalPages);
+          const last = document.createElement("a");
+          last.href = "#" + lastParams.toString();
+          last.textContent = totalPages;
+          last.classList.add("page-numbers");
+          pagination.appendChild(last);
+        }
+
+        // Next link
+        if (currentPage < totalPages) {
+          const nextParams = new URLSearchParams();
+          nextParams.set("filter", state.filter);
+          nextParams.set("tab", state.tab);
+          nextParams.set("page", currentPage + 1);
+          const next = document.createElement("a");
+          next.href = "#" + nextParams.toString();
+          next.textContent = "»";
+          next.classList.add("next", "page-numbers");
+          pagination.appendChild(next);
         }
       }
 
       function applyState() {
         const state = getState();
 
-        // ✅ sync filter dropdown always
         if (filterSelect) {
           if ([...filterSelect.options].some(opt => opt.value === state.filter)) {
             filterSelect.value = state.filter;
@@ -208,8 +283,6 @@ function projekte_tabs_shortcode() {
         const totalItems = visibleCards.length;
         const totalPages = Math.ceil(totalItems / pageSize);
         let currentPage = state.page;
-
-        // ✅ if page > totalPages, reset to last page
         if (currentPage > totalPages) currentPage = totalPages || 1;
 
         const start = (currentPage - 1) * pageSize;
