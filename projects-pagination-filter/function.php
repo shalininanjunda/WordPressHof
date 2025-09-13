@@ -168,15 +168,42 @@ function projekte_tabs_shortcode() {
             });
         }
 
+        // ✅ Tabs click → reload with hash only (reset pagination but keep filter)
         tabs.forEach(tab => {
             tab.addEventListener("click", function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
-                history.replaceState(null, null, "#" + tabName);
-                activateTab(tabName);
+                const baseUrl = window.location.origin + window.location.pathname;
+                const params = new URLSearchParams(window.location.search);
+
+                // Keep filter if selected
+                const filter = document.querySelector(".projekte-filter select");
+                if (filter && filter.value) {
+                    params.set(filter.name, filter.value);
+                }
+
+                window.location.href = baseUrl + "?" + params.toString() + "#" + tabName;
             });
         });
 
+        // ✅ Filter change → force reload and keep active tab
+        const filterSelect = document.querySelector(".projekte-filter select");
+        if (filterSelect) {
+            filterSelect.addEventListener("change", function() {
+                const baseUrl = window.location.origin + window.location.pathname;
+                const params = new URLSearchParams();
+
+                if (this.value) {
+                    params.set(this.name, this.value);
+                }
+
+                // Keep current tab hash
+                const currentHash = window.location.hash || "#all";
+                window.location.href = baseUrl + "?" + params.toString() + currentHash;
+            });
+        }
+
+        // On page load → activate correct tab
         const initialTab = window.location.hash.replace("#", "") || "all";
         activateTab(initialTab);
     });
