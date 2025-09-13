@@ -6,11 +6,10 @@ function projekte_filter_form_global($taxonomy) {
 
     if ($terms && !is_wp_error($terms)) {
         echo '<form method="get" class="projekte-filter">';
-        echo '<select name="' . esc_attr($taxonomy) . '" onchange="this.form.submit()">';
+        echo '<select id="filter-' . esc_attr($taxonomy) . '" name="' . esc_attr($taxonomy) . '">';
         echo '<option value="">Alle ' . ucfirst($taxonomy) . '</option>';
         foreach ($terms as $term) {
-            $is_selected = (isset($_GET[$taxonomy]) && $_GET[$taxonomy] == $term->slug) ? 'selected' : '';
-            echo '<option value="' . esc_attr($term->slug) . '" ' . $is_selected . '>' . esc_html($term->name) . '</option>';
+            echo '<option value="' . esc_attr($term->slug) . '">' . esc_html($term->name) . '</option>';
         }
         echo '</select>';
         echo '</form>';
@@ -28,6 +27,7 @@ function projekte_list_shortcode($atts) {
         'tab'    => 'all',
     ], $atts);
 
+    // Pagination per tab
     $paged_key = 'paged_' . $atts['tab'];
     $paged = isset($_GET[$paged_key]) ? intval($_GET[$paged_key]) : 1;
 
@@ -104,7 +104,6 @@ function projekte_list_shortcode($atts) {
             'total'   => $query->max_num_pages,
             'current' => $paged,
             'format'  => '?' . $paged_key . '=%#%',
-            'add_args' => array_filter($_GET), // keep filter param
         ]);
         echo '</div>';
     } else {
@@ -147,17 +146,35 @@ function projekte_tabs_shortcode() {
 document.addEventListener("DOMContentLoaded", function() {
     const tabs = document.querySelectorAll(".tab-nav a");
     const contents = document.querySelectorAll(".tab-content");
-    const filterSelect = document.querySelector(".projekte-filter select");
+    const filterDropdown = document.querySelector(".projekte-filter select");
 
-    // ✅ Ensure filter dropdown reflects URL query param
-    if (filterSelect) {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has(filterSelect.name)) {
-            const val = params.get(filterSelect.name);
-            if (val) {
-                filterSelect.value = val;   // force restore selected option
-            }
-        }
+    // ✅ Restore saved filter in dropdown
+    const savedFilter = localStorage.getItem("selectedFilter");
+    if (filterDropdown && savedFilter) {
+        filterDropdown.value = savedFilter;
+    }
+
+    // ✅ Save filter on change
+    if (filterDropdown) {
+        filterDropdown.addEventListener("change", function() {
+            localStorage.setItem("selectedFilter", this.value);
+            reloadWithParams();
+        });
+    }
+
+    // ✅ Build full URL with tab + filter
+    function reloadWithParams(tabName = null, page = null) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const filterVal = localStorage.getItem("selectedFilter") || "";
+        const currentTab = tabName || (document.querySelector(".tab-nav li.active a")?.dataset.tab || "all");
+
+        let query = [];
+        if (filterVal) query.push("forschungsgruppe=" + encodeURIComponent(filterVal));
+        if (page) query.push(page);
+
+        // reload page with proper hash
+        const url = baseUrl + (query.length ? "?" + query.join("&") : "") + "#" + currentTab;
+        window.location.href = url;
     }
 
     function activateTab(tab) {
@@ -166,7 +183,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
         const target = document.getElementById("tab-" + tab);
         if (target) {
-            document.querySelector('.tab-nav a[data-tab="' + tab + '"]').parentElement.classList.add("active");
+            const navLink = document.querySelector('.tab-nav a[data-tab="' + tab + '"]');
+            if (navLink) navLink.parentElement.classList.add("active");
             target.classList.add("active");
             updatePaginationLinks(tab);
         }
@@ -176,26 +194,112 @@ document.addEventListener("DOMContentLoaded", function() {
         const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
         paginationLinks.forEach(link => {
             const url = new URL(link.href);
-            // Preserve query params
+            const filterVal = localStorage.getItem("selectedFilter") || "";
+            if (filterVal) {
+                url.searchParams.set("forschungsgruppe", filterVal);
+            }
             link.href = url.pathname + url.search + "#" + tab;
         });
     }
 
-    // ✅ Tab clicks: reload with same filter params
+    // ✅ Tab click → reload with filter
     tabs.forEach(tab => {
         tab.addEventListener("click", function(e) {
             e.preventDefault();
             const tabName = this.dataset.tab;
-
-            const params = window.location.search; // keep filter
-            const baseUrl = window.location.origin + window.location.pathname;
-            window.location.href = baseUrl + params + "#" + tabName; // reload
+            reloadWithParams(tabName);
         });
     });
 
-    // ✅ On page load, activate the right tab
+    // ✅ On page load → activate tab based on hash
     const initialTab = window.location.hash.replace("#", "") || "all";
     activateTab(initialTab);
+
+    // ✅ Handle back/forward navigation
+    window.addEventListener("hashchange", function() {
+        const currentTab = window.location.hash.replace("#", "") || "all";
+        activateTab(currentTab);
+    });
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const tabs = document.querySelectorAll(".tab-nav a");
+    const contents = document.querySelectorAll(".tab-content");
+    const filterDropdown = document.querySelector(".projekte-filter select");
+
+    // ✅ Restore saved filter in dropdown
+    const savedFilter = localStorage.getItem("selectedFilter");
+    if (filterDropdown && savedFilter) {
+        filterDropdown.value = savedFilter;
+    }
+
+    // ✅ Save filter on change
+    if (filterDropdown) {
+        filterDropdown.addEventListener("change", function() {
+            localStorage.setItem("selectedFilter", this.value);
+            reloadWithParams();
+        });
+    }
+
+    // ✅ Build full URL with tab + filter
+    function reloadWithParams(tabName = null, page = null) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const filterVal = localStorage.getItem("selectedFilter") || "";
+        const currentTab = tabName || (document.querySelector(".tab-nav li.active a")?.dataset.tab || "all");
+
+        let query = [];
+        if (filterVal) query.push("forschungsgruppe=" + encodeURIComponent(filterVal));
+        if (page) query.push(page);
+
+        // reload page with proper hash
+        const url = baseUrl + (query.length ? "?" + query.join("&") : "") + "#" + currentTab;
+        window.location.href = url;
+    }
+
+    function activateTab(tab) {
+        tabs.forEach(t => t.parentElement.classList.remove("active"));
+        contents.forEach(c => c.classList.remove("active"));
+
+        const target = document.getElementById("tab-" + tab);
+        if (target) {
+            const navLink = document.querySelector('.tab-nav a[data-tab="' + tab + '"]');
+            if (navLink) navLink.parentElement.classList.add("active");
+            target.classList.add("active");
+            updatePaginationLinks(tab);
+        }
+    }
+
+    function updatePaginationLinks(tab) {
+        const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
+        paginationLinks.forEach(link => {
+            const url = new URL(link.href);
+            const filterVal = localStorage.getItem("selectedFilter") || "";
+            if (filterVal) {
+                url.searchParams.set("forschungsgruppe", filterVal);
+            }
+            link.href = url.pathname + url.search + "#" + tab;
+        });
+    }
+
+    // ✅ Tab click → reload with filter
+    tabs.forEach(tab => {
+        tab.addEventListener("click", function(e) {
+            e.preventDefault();
+            const tabName = this.dataset.tab;
+            reloadWithParams(tabName);
+        });
+    });
+
+    // ✅ On page load → activate tab based on hash
+    const initialTab = window.location.hash.replace("#", "") || "all";
+    activateTab(initialTab);
+
+    // ✅ Handle back/forward navigation
+    window.addEventListener("hashchange", function() {
+        const currentTab = window.location.hash.replace("#", "") || "all";
+        activateTab(currentTab);
+    });
 });
 </script>
 
