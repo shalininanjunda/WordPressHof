@@ -80,6 +80,35 @@
 }
   
 /* =========================
+   Global Project Filter
+========================= */
+.projekte-filter {
+    display: block;        /* form is block-level */
+    width: 100%;           /* span full row */
+    text-align: right;     /* align dropdown to the right */
+    margin-bottom: 1rem;   /* spacing before tabs */
+  }
+  
+  .projekte-filter select {
+    display: inline-block; /* keep dropdown its natural size */
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background: #fff;
+    min-width: 220px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .projekte-filter select:hover,
+  .projekte-filter select:focus {
+    border-color: #0066cc;
+    box-shadow: 0 0 4px rgba(0, 102, 204, 0.3);
+    outline: none;
+  }
+      
+/* =========================
    Pagination (Centered)
 ========================= */
 .pagination {
@@ -147,13 +176,8 @@
     transform: translateY(-50%);
 }
   
-.pagination .prev {
-    left: 0;
-}
-  
-.pagination .next {
-    right: 0;
-}
+.pagination .prev { left: 0; }
+.pagination .next { right: 0; }
   
 .pagination .prev:hover { transform: translate(-2px, -50%); }
 .pagination .next:hover { transform: translate(2px, -50%); }
@@ -196,9 +220,7 @@
     transition: background 0.3s, font-weight 0.2s;
 }
   
-.tab-nav li:hover {
-    background: #eee;
-}
+.tab-nav li:hover { background: #eee; }
   
 .tab-nav li.active {
     background: #fff;
@@ -207,10 +229,5 @@
     font-weight: 700;
 }
   
-.tab-content {
-    display: none;
-}
-  
-.tab-content.active {
-    display: block;
-}
+.tab-content { display: none; }
+.tab-content.active { display: block; }

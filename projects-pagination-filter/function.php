@@ -1,15 +1,15 @@
 // -------------------------
-// FILTER FORM (global, works for all tabs)
+// FILTER FORM (global, before tabs)
 // -------------------------
-function projekte_filter_form($taxonomy, $selected = '', $tab = 'all') {
+function projekte_filter_form_global($taxonomy) {
     $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
 
     if ($terms && !is_wp_error($terms)) {
         echo '<form method="get" class="projekte-filter">';
-        echo '<select name="' . esc_attr($taxonomy . '_' . $tab) . '" onchange="this.form.submit()">';
+        echo '<select name="' . esc_attr($taxonomy) . '" onchange="this.form.submit()">';
         echo '<option value="">Alle ' . ucfirst($taxonomy) . '</option>';
         foreach ($terms as $term) {
-            $is_selected = ($selected == $term->slug) ? 'selected' : '';
+            $is_selected = (isset($_GET[$taxonomy]) && $_GET[$taxonomy] == $term->slug) ? 'selected' : '';
             echo '<option value="' . esc_attr($term->slug) . '" ' . $is_selected . '>' . esc_html($term->name) . '</option>';
         }
         echo '</select>';
@@ -28,7 +28,6 @@ function projekte_list_shortcode($atts) {
         'tab'    => 'all',
     ], $atts);
 
-    // Detect pagination separately per tab
     $paged_key = 'paged_' . $atts['tab'];
     $paged = isset($_GET[$paged_key]) ? intval($_GET[$paged_key]) : 1;
 
@@ -39,7 +38,7 @@ function projekte_list_shortcode($atts) {
         'post_status'    => 'publish',
     ];
 
-    // ✅ Filter by projektstatus taxonomy
+    // ✅ projektstatus filter
     if ($atts['status'] === 'aktuell') {
         $args['tax_query'][] = [
             'taxonomy' => 'projektstatus',
@@ -54,13 +53,12 @@ function projekte_list_shortcode($atts) {
         ];
     }
 
-    // ✅ Extra filter: Forschungsgruppe
-    $tax_filter_key = 'forschungsgruppe_' . $atts['tab'];
-    if (!empty($_GET[$tax_filter_key])) {
+    // ✅ global filter (forschungsgruppe)
+    if (!empty($_GET['forschungsgruppe'])) {
         $args['tax_query'][] = [
             'taxonomy' => 'forschungsgruppe',
             'field'    => 'slug',
-            'terms'    => sanitize_text_field($_GET[$tax_filter_key]),
+            'terms'    => sanitize_text_field($_GET['forschungsgruppe']),
         ];
     }
 
@@ -76,16 +74,13 @@ function projekte_list_shortcode($atts) {
             $logo       = $logo_id ? wp_get_attachment_image($logo_id, 'large', false, ['class' => 'projekt-logo-img']) : '';
 
             echo '<div class="projekt-card">';
-            
-            // ✅ Full-width Logo
             if ($logo) {
                 echo '<div class="projekt-image">' . $logo . '</div>';
             }
 
-            // Title
             echo '<h3>' . get_the_title() . '</h3>';
 
-            // ✅ Show projektstatus name
+            // ✅ projektstatus name
             $status_id = get_post_meta(get_the_ID(), 'projekt_status', true);
             if ($status_id) {
                 $status_term = get_term_by('id', intval($status_id), 'projektstatus');
@@ -94,24 +89,22 @@ function projekte_list_shortcode($atts) {
                 }
             }
 
-            // Short description
             if ($short_desc) {
                 echo '<p>' . esc_html($short_desc) . '</p>';
             }
 
-            // Link
             echo '<a href="' . get_permalink() . '">Zum Projekt →</a>';
-
-            echo '</div>'; // .projekt-card
+            echo '</div>';
         }
-        echo '</div>'; // .projekte-list
+        echo '</div>';
 
-        // ✅ Separate pagination per tab
+        // ✅ Pagination
         echo '<div class="pagination">';
         echo paginate_links([
             'total'   => $query->max_num_pages,
             'current' => $paged,
             'format'  => '?' . $paged_key . '=%#%',
+            'add_args' => array_filter($_GET), // keep filter param
         ]);
         echo '</div>';
     } else {
@@ -119,7 +112,6 @@ function projekte_list_shortcode($atts) {
     }
 
     wp_reset_postdata();
-
     return ob_get_clean();
 }
 add_shortcode('projekte_list', 'projekte_list_shortcode');
@@ -128,14 +120,11 @@ add_shortcode('projekte_list', 'projekte_list_shortcode');
 // TABS SHORTCODE
 // -------------------------
 function projekte_tabs_shortcode() {
-    ob_start();
-    ?>
+    ob_start(); ?>
     <div class="projekte-tabs">
 
-        <!-- ✅ Global Filter Above Tabs -->
-        <div class="projekte-filter">
-            <?php projekte_filter_form('forschungsgruppe', $_GET['forschungsgruppe_all'] ?? '', 'all'); ?>
-        </div>
+        <!-- ✅ Global Filter before tabs -->
+        <?php projekte_filter_form_global('forschungsgruppe'); ?>
 
         <ul class="tab-nav">
             <li class="active"><a href="#all" data-tab="all">Alle Projekte</a></li>
@@ -155,61 +144,42 @@ function projekte_tabs_shortcode() {
     </div>
 
     <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const tabs = document.querySelectorAll(".tab-nav a");
-    const contents = document.querySelectorAll(".tab-content");
+    document.addEventListener("DOMContentLoaded", function() {
+        const tabs = document.querySelectorAll(".tab-nav a");
+        const contents = document.querySelectorAll(".tab-content");
 
-    function activateTab(tab) {
-        // deactivate all
-        tabs.forEach(t => t.parentElement.classList.remove("active"));
-        contents.forEach(c => c.classList.remove("active"));
+        function activateTab(tab) {
+            tabs.forEach(t => t.parentElement.classList.remove("active"));
+            contents.forEach(c => c.classList.remove("active"));
 
-        // activate selected tab
-        const target = document.getElementById("tab-" + tab);
-        if (target) {
-            document.querySelector('.tab-nav a[data-tab="' + tab + '"]').parentElement.classList.add("active");
-            target.classList.add("active");
-
-            // fix pagination links for this tab
-            updatePaginationLinks(tab);
-        }
-    }
-
-    function updatePaginationLinks(tab) {
-        const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
-        paginationLinks.forEach(link => {
-            const url = new URL(link.href);
-
-            // ✅ keep the pagination param (?paged_tab=X), remove everything else
-            const searchParams = new URLSearchParams(url.search);
-            let newSearch = "";
-
-            for (const [key, value] of searchParams.entries()) {
-                if (key.startsWith("paged_")) {
-                    newSearch = "?" + key + "=" + value;
-                }
+            const target = document.getElementById("tab-" + tab);
+            if (target) {
+                document.querySelector('.tab-nav a[data-tab="' + tab + '"]').parentElement.classList.add("active");
+                target.classList.add("active");
+                updatePaginationLinks(tab);
             }
+        }
 
-            link.href = url.pathname + newSearch + "#" + tab;
+        function updatePaginationLinks(tab) {
+            const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
+            paginationLinks.forEach(link => {
+                const url = new URL(link.href);
+                link.href = url.pathname + url.search + "#" + tab;
+            });
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener("click", function(e) {
+                e.preventDefault();
+                const tabName = this.dataset.tab;
+                history.replaceState(null, null, "#" + tabName);
+                activateTab(tabName);
+            });
         });
-    }
 
-    tabs.forEach(tab => {
-        tab.addEventListener("click", function(e) {
-            e.preventDefault();
-            const tabName = this.dataset.tab;
-
-            // ✅ Reset URL to only hash (no filters, no pagination)
-            history.replaceState(null, null, "#" + tabName);
-
-            activateTab(tabName);
-        });
+        const initialTab = window.location.hash.replace("#", "") || "all";
+        activateTab(initialTab);
     });
-
-    // on page load
-    const initialTab = window.location.hash.replace("#", "") || "all";
-    activateTab(initialTab);
-});
     </script>
     <?php
     return ob_get_clean();
