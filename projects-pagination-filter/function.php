@@ -144,70 +144,62 @@ function projekte_tabs_shortcode() {
     </div>
 
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const tabs = document.querySelectorAll(".tab-nav a");
-        const contents = document.querySelectorAll(".tab-content");
+document.addEventListener("DOMContentLoaded", function() {
+    const tabs = document.querySelectorAll(".tab-nav a");
+    const contents = document.querySelectorAll(".tab-content");
+    const filterSelect = document.querySelector(".projekte-filter select");
 
-        function activateTab(tab) {
-            tabs.forEach(t => t.parentElement.classList.remove("active"));
-            contents.forEach(c => c.classList.remove("active"));
-
-            const target = document.getElementById("tab-" + tab);
-            if (target) {
-                document.querySelector('.tab-nav a[data-tab="' + tab + '"]').parentElement.classList.add("active");
-                target.classList.add("active");
-                updatePaginationLinks(tab);
+    // ✅ Ensure filter dropdown reflects URL query param
+    if (filterSelect) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has(filterSelect.name)) {
+            const val = params.get(filterSelect.name);
+            if (val) {
+                filterSelect.value = val;   // force restore selected option
             }
         }
+    }
 
-        function updatePaginationLinks(tab) {
-            const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
-            paginationLinks.forEach(link => {
-                const url = new URL(link.href);
-                link.href = url.pathname + url.search + "#" + tab;
-            });
+    function activateTab(tab) {
+        tabs.forEach(t => t.parentElement.classList.remove("active"));
+        contents.forEach(c => c.classList.remove("active"));
+
+        const target = document.getElementById("tab-" + tab);
+        if (target) {
+            document.querySelector('.tab-nav a[data-tab="' + tab + '"]').parentElement.classList.add("active");
+            target.classList.add("active");
+            updatePaginationLinks(tab);
         }
+    }
 
-        // ✅ Tabs click → reload with hash only (reset pagination but keep filter)
-        tabs.forEach(tab => {
-            tab.addEventListener("click", function(e) {
-                e.preventDefault();
-                const tabName = this.dataset.tab;
-                const baseUrl = window.location.origin + window.location.pathname;
-                const params = new URLSearchParams(window.location.search);
-
-                // Keep filter if selected
-                const filter = document.querySelector(".projekte-filter select");
-                if (filter && filter.value) {
-                    params.set(filter.name, filter.value);
-                }
-
-                window.location.href = baseUrl + "?" + params.toString() + "#" + tabName;
-            });
+    function updatePaginationLinks(tab) {
+        const paginationLinks = document.querySelectorAll("#tab-" + tab + " .pagination a");
+        paginationLinks.forEach(link => {
+            const url = new URL(link.href);
+            // Preserve query params
+            link.href = url.pathname + url.search + "#" + tab;
         });
+    }
 
-        // ✅ Filter change → force reload and keep active tab
-        const filterSelect = document.querySelector(".projekte-filter select");
-        if (filterSelect) {
-            filterSelect.addEventListener("change", function() {
-                const baseUrl = window.location.origin + window.location.pathname;
-                const params = new URLSearchParams();
+    // ✅ Tab clicks: reload with same filter params
+    tabs.forEach(tab => {
+        tab.addEventListener("click", function(e) {
+            e.preventDefault();
+            const tabName = this.dataset.tab;
 
-                if (this.value) {
-                    params.set(this.name, this.value);
-                }
-
-                // Keep current tab hash
-                const currentHash = window.location.hash || "#all";
-                window.location.href = baseUrl + "?" + params.toString() + currentHash;
-            });
-        }
-
-        // On page load → activate correct tab
-        const initialTab = window.location.hash.replace("#", "") || "all";
-        activateTab(initialTab);
+            const params = window.location.search; // keep filter
+            const baseUrl = window.location.origin + window.location.pathname;
+            window.location.href = baseUrl + params + "#" + tabName; // reload
+        });
     });
-    </script>
+
+    // ✅ On page load, activate the right tab
+    const initialTab = window.location.hash.replace("#", "") || "all";
+    activateTab(initialTab);
+});
+</script>
+
+
     <?php
     return ob_get_clean();
 }
