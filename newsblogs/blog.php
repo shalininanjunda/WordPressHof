@@ -1,5 +1,4 @@
 
-// Schedule hourly sync
 if ( ! wp_next_scheduled( 'sync_external_posts_event' ) ) {
     wp_schedule_event( time(), 'hourly', 'sync_external_posts_event' );
 }
@@ -33,6 +32,7 @@ function sync_external_posts_from_api( $debug_output = false ) {
             $content     = $post['content']['rendered'];
             $date        = $post['date'];
             $slug        = $post['slug'];
+            $external_link = $post['link']; // Original Campuls URL
 
             $existing = new WP_Query([
                 'post_type'  => 'post',
@@ -64,6 +64,9 @@ function sync_external_posts_from_api( $debug_output = false ) {
                 if ( $image_url ) {
                     update_post_meta( $existing_post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
                 }
+                if ( $external_link ) {
+                    update_post_meta( $existing_post_id, '_external_source_link', esc_url_raw( $external_link ) );
+                }
 
                 if ( $debug_output ) {
                     echo "<p>Updated: <strong>{$title}</strong> (ID: {$existing_post_id})<br>Image URL: " 
@@ -85,6 +88,9 @@ function sync_external_posts_from_api( $debug_output = false ) {
 
                     if ( $image_url ) {
                         update_post_meta( $new_post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
+                    }
+                    if ( $external_link ) {
+                        update_post_meta( $new_post_id, '_external_source_link', esc_url_raw( $external_link ) );
                     }
 
                     if ( $debug_output ) {
@@ -170,9 +176,31 @@ add_filter( 'get_post_metadata', function( $value, $object_id, $meta_key, $singl
     if ( $meta_key === '_thumbnail_id' ) {
         $external = get_post_meta( $object_id, '_external_thumbnail_url', true );
         if ( $external ) {
-            // Fake an ID so editor/front-end believes a featured image exists
-            return 999999;
+            return 999999; // Fake attachment ID
         }
     }
     return $value;
+}, 10, 4);
+
+// Make editor/frontend load external image instead of failing
+add_filter( 'wp_get_attachment_image_src', function( $image, $attachment_id, $size, $icon ) {
+    global $post;
+    if ( $attachment_id === 999999 && $post ) {
+        $external = get_post_meta( $post->ID, '_external_thumbnail_url', true );
+        if ( $external ) {
+            return [ $external, 600, 400, true ];
+        }
+    }
+    return $image;
+}, 10, 4);
+
+/**
+ * Override permalink so Elementor + frontend redirects to original Campuls URL
+ */
+add_filter( 'post_type_link', function( $url, $post, $leavename, $sample ) {
+    $external = get_post_meta( $post->ID, '_external_source_link', true );
+    if ( $external ) {
+        return esc_url( $external );
+    }
+    return $url;
 }, 10, 4);
