@@ -1,102 +1,99 @@
 
+
 if ( ! wp_next_scheduled( 'sync_external_posts_event' ) ) {
     wp_schedule_event( time(), 'hourly', 'sync_external_posts_event' );
 }
 
-add_action( 'sync_external_posts_event', 'sync_external_posts_from_api' );
+add_action( 'sync_external_posts_event', 'sync_external_posts_from_german_html' );
 
 /**
- * Main sync function
+ * Sync from German frontend page (title, link, image, date, description)
  */
-function sync_external_posts_from_api( $debug_output = false ) {
-    $tag_id   = 5816;
-    $per_page = 20;
-    $base_url = 'https://campuls.hof-university.com/wp-json/wp/v2/posts?tags=' . $tag_id . '&_embed=1&per_page=' . $per_page;
-
-    $response = wp_remote_get( $base_url . '&page=1' );
+function sync_external_posts_from_german_html( $debug_output = false ) {
+    $url = 'https://campuls.hof-university.de/Schlagwort/inwa-de/';
+    $response = wp_remote_get( $url );
     if ( is_wp_error( $response ) ) return;
 
-    $total_pages = (int) wp_remote_retrieve_header( $response, 'x-wp-totalpages' );
-    if ( $total_pages < 1 ) $total_pages = 1;
+    $html = wp_remote_retrieve_body( $response );
+    if ( empty( $html ) ) return;
 
-    for ( $page = 1; $page <= $total_pages; $page++ ) {
-        $response = wp_remote_get( $base_url . '&page=' . $page );
-        if ( is_wp_error( $response ) ) continue;
+    // Parse HTML
+    libxml_use_internal_errors( true );
+    $dom = new DOMDocument();
+    $dom->loadHTML( $html );
+    libxml_clear_errors();
 
-        $posts = json_decode( wp_remote_retrieve_body( $response ), true );
-        if ( empty( $posts ) ) continue;
+    $xpath = new DOMXPath( $dom );
+    $nodes = $xpath->query('//article'); // each post is in <article>
 
-        foreach ( $posts as $post ) {
-            $source_id   = $post['id'];
-            $title       = wp_strip_all_tags( $post['title']['rendered'] );
-            $content     = $post['content']['rendered'];
-            $date        = $post['date'];
-            $slug        = $post['slug'];
-            $external_link = $post['link']; // Original Campuls URL
+    foreach ( $nodes as $node ) {
+        // Title
+        $titleNode = $xpath->query('.//h2//a', $node);
+        $title     = $titleNode->length ? trim($titleNode->item(0)->nodeValue) : '';
 
-            $existing = new WP_Query([
-                'post_type'  => 'post',
-                'meta_query' => [
-                    [
-                        'key'   => '_source_post_id',
-                        'value' => $source_id,
-                    ]
+        // Link
+        $link      = $titleNode->length ? $titleNode->item(0)->getAttribute('href') : '';
+
+        // Image
+        $imgNode   = $xpath->query('.//img', $node);
+        $image_url = $imgNode->length ? $imgNode->item(0)->getAttribute('src') : '';
+
+        // Date
+        $dateNode  = $xpath->query('.//time', $node);
+        $date      = $dateNode->length ? $dateNode->item(0)->getAttribute('datetime') : current_time('mysql');
+
+        // Description (first <p>)
+        $descNode  = $xpath->query('.//p', $node);
+        $desc      = $descNode->length ? trim($descNode->item(0)->nodeValue) : '';
+
+        if ( ! $link || ! $title ) continue;
+
+        // Check if already imported (by external link)
+        $existing = new WP_Query([
+            'post_type'  => 'post',
+            'meta_query' => [
+                [
+                    'key'   => '_external_source_link',
+                    'value' => $link,
                 ]
+            ]
+        ]);
+
+        if ( $existing->have_posts() ) {
+            $post_id = $existing->posts[0]->ID;
+
+            wp_update_post([
+                'ID'           => $post_id,
+                'post_title'   => $title,
+                'post_date'    => $date,
+                'post_content' => $desc, // update description
             ]);
 
-            // --- Featured Image (Hotlink) ---
-            $image_url = '';
-            if ( isset( $post['_embedded']['wp:featuredmedia'][0]['source_url'] ) ) {
-                $image_url = $post['_embedded']['wp:featuredmedia'][0]['source_url'];
+            if ( $image_url ) {
+                update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
             }
 
-            if ( $existing->have_posts() ) {
-                $existing_post_id = $existing->posts[0]->ID;
+            if ( $debug_output ) {
+                echo "<p>Updated: <strong>{$title}</strong></p>";
+            }
 
-                wp_update_post([
-                    'ID'           => $existing_post_id,
-                    'post_title'   => $title,
-                    'post_content' => $content,
-                    'post_date'    => $date,
-                    'post_name'    => $slug,
-                ]);
+        } else {
+            $post_id = wp_insert_post([
+                'post_title'   => $title,
+                'post_content' => $desc, // insert description
+                'post_status'  => 'publish',
+                'post_date'    => $date,
+                'post_type'    => 'post',
+            ]);
 
+            if ( $post_id && ! is_wp_error( $post_id ) ) {
+                update_post_meta( $post_id, '_external_source_link', esc_url_raw( $link ) );
                 if ( $image_url ) {
-                    update_post_meta( $existing_post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
-                }
-                if ( $external_link ) {
-                    update_post_meta( $existing_post_id, '_external_source_link', esc_url_raw( $external_link ) );
+                    update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
                 }
 
                 if ( $debug_output ) {
-                    echo "<p>Updated: <strong>{$title}</strong> (ID: {$existing_post_id})<br>Image URL: " 
-                        . ( $image_url ? "<img src='" . esc_url( $image_url ) . "' style='max-width:150px;'><br><code>{$image_url}</code>" : "<span style='color:red;'>None</span>" ) . "</p>";
-                }
-
-            } else {
-                $new_post_id = wp_insert_post([
-                    'post_title'   => $title,
-                    'post_content' => $content,
-                    'post_status'  => 'publish',
-                    'post_date'    => $date,
-                    'post_name'    => $slug,
-                    'post_type'    => 'post',
-                ]);
-
-                if ( $new_post_id && ! is_wp_error( $new_post_id ) ) {
-                    update_post_meta( $new_post_id, '_source_post_id', $source_id );
-
-                    if ( $image_url ) {
-                        update_post_meta( $new_post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
-                    }
-                    if ( $external_link ) {
-                        update_post_meta( $new_post_id, '_external_source_link', esc_url_raw( $external_link ) );
-                    }
-
-                    if ( $debug_output ) {
-                        echo "<p>Inserted: <strong>{$title}</strong> (ID: {$new_post_id})<br>Image URL: " 
-                            . ( $image_url ? "<img src='" . esc_url( $image_url ) . "' style='max-width:150px;'><br><code>{$image_url}</code>" : "<span style='color:red;'>None</span>" ) . "</p>";
-                    }
+                    echo "<p>Inserted: <strong>{$title}</strong></p>";
                 }
             }
         }
@@ -104,43 +101,30 @@ function sync_external_posts_from_api( $debug_output = false ) {
 }
 
 /**
- * Manual sync with debug report
+ * Manual sync trigger
  * URL: http://your-site.com/?run_sync_now=1
  */
 add_action( 'init', function () {
     if ( isset($_GET['run_sync_now']) && $_GET['run_sync_now'] == 1 ) {
-        echo "<h2>Manual Sync Report</h2>";
-
-        $response = wp_remote_get( 'https://campuls.hof-university.com/wp-json/wp/v2/posts?tags=5816&_embed=1&per_page=1' );
-        if ( is_wp_error( $response ) ) {
-            echo "<p style='color:red;'>API request failed: " . $response->get_error_message() . "</p>";
-            exit;
-        }
-
-        $status_code = wp_remote_retrieve_response_code( $response );
-        echo "<p>API HTTP Status: {$status_code}</p>";
-
-        $total_pages = (int) wp_remote_retrieve_header( $response, 'x-wp-totalpages' );
-        if ( $total_pages < 1 ) $total_pages = 1;
-        echo "<p>Total pages reported by API: {$total_pages}</p>";
-
-        sync_external_posts_from_api( true );
+        echo "<h2>Manual German Sync Report</h2>";
+        sync_external_posts_from_german_html( true );
         exit;
     }
 });
 
 /**
- * Add admin columns: Source ID + Featured Image
+ * Admin columns for Source Link + Featured Image
  */
 add_filter( 'manage_post_posts_columns', function( $columns ) {
-    $columns['source_post_id'] = 'Source ID';
+    $columns['external_source_link'] = 'Source Link';
     $columns['featured_image'] = 'Featured Image';
     return $columns;
 });
 
 add_action( 'manage_post_posts_custom_column', function( $column, $post_id ) {
-    if ( $column === 'source_post_id' ) {
-        echo esc_html( get_post_meta( $post_id, '_source_post_id', true ) ?: '-' );
+    if ( $column === 'external_source_link' ) {
+        $link = get_post_meta( $post_id, '_external_source_link', true );
+        echo $link ? '<a href="' . esc_url( $link ) . '" target="_blank">View Source</a>' : '-';
     }
 
     if ( $column === 'featured_image' ) {
@@ -156,7 +140,7 @@ add_action( 'manage_post_posts_custom_column', function( $column, $post_id ) {
 }, 10, 2);
 
 /**
- * Filters to make external image behave like a real Featured Image
+ * Featured image hotlink filters
  */
 add_filter( 'has_post_thumbnail', function( $has_thumbnail, $post ) {
     $external = get_post_meta( $post->ID, '_external_thumbnail_url', true );
@@ -182,7 +166,6 @@ add_filter( 'get_post_metadata', function( $value, $object_id, $meta_key, $singl
     return $value;
 }, 10, 4);
 
-// Make editor/frontend load external image instead of failing
 add_filter( 'wp_get_attachment_image_src', function( $image, $attachment_id, $size, $icon ) {
     global $post;
     if ( $attachment_id === 999999 && $post ) {
@@ -195,12 +178,19 @@ add_filter( 'wp_get_attachment_image_src', function( $image, $attachment_id, $si
 }, 10, 4);
 
 /**
- * Override permalink so Elementor + frontend redirects to original Campuls URL
+ * Force permalinks to go to Campuls original post
  */
 add_filter( 'post_type_link', function( $url, $post, $leavename, $sample ) {
     $external = get_post_meta( $post->ID, '_external_source_link', true );
-    if ( $external ) {
-        return esc_url( $external );
-    }
-    return $url;
+    return $external ? esc_url( $external ) : $url;
 }, 10, 4);
+
+add_filter( 'post_link', function( $permalink, $post, $leavename ) {
+    $external = get_post_meta( $post->ID, '_external_source_link', true );
+    return $external ? esc_url( $external ) : $permalink;
+}, 10, 3);
+
+add_filter( 'page_link', function( $permalink, $post_id, $leavename ) {
+    $external = get_post_meta( $post_id, '_external_source_link', true );
+    return $external ? esc_url( $external ) : $permalink;
+}, 10, 3);
