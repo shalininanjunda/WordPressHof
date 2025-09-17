@@ -1,109 +1,120 @@
-
-
 if ( ! wp_next_scheduled( 'sync_external_posts_event' ) ) {
     wp_schedule_event( time(), 'hourly', 'sync_external_posts_event' );
 }
 
 add_action( 'sync_external_posts_event', 'sync_external_posts_from_german_html' );
 
-/**
- * Sync from German frontend page (title, link, image, date, description)
- */
 function sync_external_posts_from_german_html( $debug_output = false ) {
-    $url = 'https://campuls.hof-university.de/Schlagwort/inwa-de/';
-    $response = wp_remote_get( $url );
-    if ( is_wp_error( $response ) ) return;
+    $urls = [
+        'https://campuls.hof-university.de/Schlagwort/inwa-de/',
+        'https://campuls.hof-university.de/Schlagwort/wasseraufbereitung/',
+        'https://campuls.hof-university.de/Schlagwort/wasserressourcen-de/',
+        'https://campuls.hof-university.de/Schlagwort/wassersysteme/',
+        'https://campuls.hof-university.de/Schlagwort/wassernutzung/',
+        'https://campuls.hof-university.de/Schlagwort/wassermanagement-de/',
+        'https://campuls.hof-university.de/Schlagwort/mueller-czygan/',
+        'https://campuls.hof-university.de/Schlagwort/wimmer/',
+        'https://campuls.hof-university.de/Schlagwort/harbach/',
+        'https://campuls.hof-university.de/Schlagwort/nachhaltigkeit/',
+        'https://campuls.hof-university.de/Schlagwort/sustainable-water-management-and-engineering/',
+    ];
 
-    $html = wp_remote_retrieve_body( $response );
-    if ( empty( $html ) ) return;
+    $posts_data = [];
 
-    // Parse HTML
-    libxml_use_internal_errors( true );
-    $dom = new DOMDocument();
-    $dom->loadHTML( $html );
-    libxml_clear_errors();
+    foreach ( $urls as $url ) {
+        $response = wp_remote_get( $url );
+        if ( is_wp_error( $response ) ) continue;
 
-    $xpath = new DOMXPath( $dom );
-    $nodes = $xpath->query('//article'); // each post is in <article>
+        $html = wp_remote_retrieve_body( $response );
+        if ( empty( $html ) ) continue;
 
-    foreach ( $nodes as $node ) {
-        // Title
-        $titleNode = $xpath->query('.//h2//a', $node);
-        $title     = $titleNode->length ? trim($titleNode->item(0)->nodeValue) : '';
+        libxml_use_internal_errors( true );
+        $dom = new DOMDocument();
+        $dom->loadHTML( $html );
+        libxml_clear_errors();
 
-        // Link
-        $link      = $titleNode->length ? $titleNode->item(0)->getAttribute('href') : '';
+        $xpath = new DOMXPath( $dom );
+        $nodes = $xpath->query('//article');
 
-        // Image
-        $imgNode   = $xpath->query('.//img', $node);
-        $image_url = $imgNode->length ? $imgNode->item(0)->getAttribute('src') : '';
+        foreach ( $nodes as $node ) {
+            // Title + Link
+            $titleNode = $xpath->query('.//h2//a', $node);
+            $title     = $titleNode->length ? trim($titleNode->item(0)->nodeValue) : '';
+            $link      = $titleNode->length ? $titleNode->item(0)->getAttribute('href') : '';
+            if ( ! $title || ! $link ) continue;
 
-        // Date
-        $dateNode  = $xpath->query('.//time', $node);
-        $date      = $dateNode->length ? $dateNode->item(0)->getAttribute('datetime') : current_time('mysql');
+            // Image
+            $imgNode   = $xpath->query('.//img', $node);
+            $image_url = $imgNode->length ? $imgNode->item(0)->getAttribute('src') : '';
 
-        // Description (first <p>)
-        $descNode  = $xpath->query('.//p', $node);
-        $desc      = $descNode->length ? trim($descNode->item(0)->nodeValue) : '';
+            // Date from <span class="datum">
+            $dateNode  = $xpath->query('.//span[contains(@class,"datum")]', $node);
+            if ( $dateNode->length ) {
+                $date_text = str_replace('Veröffentlichung:', '', trim($dateNode->item(0)->nodeValue));
+                $dt        = DateTime::createFromFormat('d.m.Y', trim($date_text));
+                $date      = $dt ? $dt->format('Y-m-d 00:00:00') : current_time('mysql');
+            } else {
+                $date = current_time('mysql');
+            }
 
-        if ( ! $link || ! $title ) continue;
+            // Description
+            $descNode  = $xpath->query('.//p', $node);
+            $desc      = $descNode->length ? trim($descNode->item(0)->nodeValue) : '';
 
-        // Check if already imported (by external link)
+            $posts_data[] = [
+                'title' => $title,
+                'link'  => $link,
+                'image' => $image_url,
+                'date'  => $date,
+                'desc'  => $desc,
+            ];
+        }
+    }
+
+    // Sort by date (newest first)
+    usort( $posts_data, function( $a, $b ) {
+        return strtotime($b['date']) <=> strtotime($a['date']);
+    });
+
+    foreach ( $posts_data as $post ) {
         $existing = new WP_Query([
             'post_type'  => 'post',
             'meta_query' => [
                 [
                     'key'   => '_external_source_link',
-                    'value' => $link,
+                    'value' => $post['link'],
                 ]
             ]
         ]);
 
         if ( $existing->have_posts() ) {
             $post_id = $existing->posts[0]->ID;
-
             wp_update_post([
                 'ID'           => $post_id,
-                'post_title'   => $title,
-                'post_date'    => $date,
-                'post_content' => $desc, // update description
+                'post_title'   => $post['title'],
+                'post_date'    => $post['date'],
+                'post_content' => $post['desc'],
             ]);
-
-            if ( $image_url ) {
-                update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
-            }
-
-            if ( $debug_output ) {
-                echo "<p>Updated: <strong>{$title}</strong></p>";
-            }
+            update_post_meta( $post_id, '_external_source_link', esc_url_raw( $post['link'] ) );
+            update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $post['image'] ) );
 
         } else {
             $post_id = wp_insert_post([
-                'post_title'   => $title,
-                'post_content' => $desc, // insert description
+                'post_title'   => $post['title'],
+                'post_content' => $post['desc'],
                 'post_status'  => 'publish',
-                'post_date'    => $date,
+                'post_date'    => $post['date'],
                 'post_type'    => 'post',
             ]);
-
             if ( $post_id && ! is_wp_error( $post_id ) ) {
-                update_post_meta( $post_id, '_external_source_link', esc_url_raw( $link ) );
-                if ( $image_url ) {
-                    update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $image_url ) );
-                }
-
-                if ( $debug_output ) {
-                    echo "<p>Inserted: <strong>{$title}</strong></p>";
-                }
+                update_post_meta( $post_id, '_external_source_link', esc_url_raw( $post['link'] ) );
+                update_post_meta( $post_id, '_external_thumbnail_url', esc_url_raw( $post['image'] ) );
             }
         }
     }
 }
 
-/**
- * Manual sync trigger
- * URL: http://your-site.com/?run_sync_now=1
- */
+// Manual sync trigger
 add_action( 'init', function () {
     if ( isset($_GET['run_sync_now']) && $_GET['run_sync_now'] == 1 ) {
         echo "<h2>Manual German Sync Report</h2>";
@@ -126,13 +137,10 @@ add_action( 'manage_post_posts_custom_column', function( $column, $post_id ) {
         $link = get_post_meta( $post_id, '_external_source_link', true );
         echo $link ? '<a href="' . esc_url( $link ) . '" target="_blank">View Source</a>' : '-';
     }
-
     if ( $column === 'featured_image' ) {
         $external = get_post_meta( $post_id, '_external_thumbnail_url', true );
         if ( $external ) {
             echo '<img src="' . esc_url( $external ) . '" style="max-width:60px; height:auto;" />';
-        } elseif ( has_post_thumbnail( $post_id ) ) {
-            echo get_the_post_thumbnail( $post_id, [60, 60] );
         } else {
             echo '<span style="color:red;">No image</span>';
         }

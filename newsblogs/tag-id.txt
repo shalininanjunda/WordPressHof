@@ -1,0 +1,12 @@
+#inwa => https://campuls.hof-university.de/Schlagwort/inwa-de/
+#Wasseraufbereitung => https://campuls.hof-university.de/Schlagwort/wasseraufbereitung/
+#Wasser => https://campuls.hof-university.de/Schlagwort/wasseraufbereitung/
+#Wasserressourcen => https://campuls.hof-university.de/Schlagwort/wasserressourcen-de/
+#Wassersysteme => https://campuls.hof-university.de/Schlagwort/wassersysteme/
+#Wassernutzung => https://campuls.hof-university.de/Schlagwort/wassernutzung/
+#Wassermanagement => https://campuls.hof-university.de/Schlagwort/wassermanagement-de/
+#Müller-Czygan => https://campuls.hof-university.de/Schlagwort/mueller-czygan/
+#Wimmer => https://campuls.hof-university.de/Schlagwort/wimmer/
+#Harbach => https://campuls.hof-university.de/Schlagwort/Harbach/
+#Nachhaltigkeit => https://campuls.hof-university.de/Schlagwort/nachhaltigkeit/
+#Sustainable Water Management and Engineering => https://campuls.hof-university.de/Schlagwort/sustainable-water-management-and-engineering/
