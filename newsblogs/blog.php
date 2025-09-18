@@ -15,7 +15,6 @@ function sync_external_posts_from_german_html( $debug_output = false ) {
         'https://campuls.hof-university.de/Schlagwort/mueller-czygan/',
         'https://campuls.hof-university.de/Schlagwort/wimmer/',
         'https://campuls.hof-university.de/Schlagwort/harbach/',
-        'https://campuls.hof-university.de/Schlagwort/nachhaltigkeit/',
         'https://campuls.hof-university.de/Schlagwort/sustainable-water-management-and-engineering/',
     ];
 
