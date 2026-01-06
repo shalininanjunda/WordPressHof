@@ -1,0 +1,92 @@
+/* Scrollable events wrapper */
+.events-wrapper {
+    max-height: calc(3 * 160px);
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Event card */
+.event-card {
+    min-height: 160px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+
+/* Header */
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.event-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Badge */
+.event-badge {
+    background: #e6f4ea;
+    color: #1f7a44;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+}
+
+/* Meta */
+.event-meta {
+    margin-top: 8px;
+    color: #667085;
+    font-size: 14px;
+}
+
+/* Notes */
+.event-notes {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #475467;
+}
+
+/* Button */
+.event-action {
+    margin-top: 14px;
+}
+
+.event-more-btn {
+    display: block;
+    text-align: center;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #d0d5dd;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+/* Scrollbar */
+.events-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+.events-wrapper::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+.event-calendar-icon {
+  fill: #667085; /* same as text */
+  flex-shrink: 0;
+}
+.event-calendar-icon {
+  fill: #344054;
+}
+
+
+/* Mobile: disable scroll */
+@media (max-width: 767px) {
+    .events-wrapper {
+        max-height: none;
+        overflow-y: visible;
+    }
+}
